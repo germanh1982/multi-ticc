@@ -27,8 +27,13 @@ class Ticc:
                 if line.startswith('#') or len(line) == 0:
                     pass
                 else:
-                    meas, chan = line.split(' ', maxsplit=2)
-                    yield (chan, meas)
+                    try:
+                        meas, chan = line.split(' ', maxsplit=2)
+                    except ValueError:
+                        # ignore lines with wrong format
+                        pass
+                    else:
+                        yield (chan, meas)
 
     def flush(self):
         self._buf = b''
@@ -55,15 +60,10 @@ def main():
             
             else:
                 for line in ticc.lines():
-                    try:
-                        chan, meas = line
-                    except ValueError:
-                        # line has wrong format
-                        log.warning(f"Received malformed line: {line}")
-                        pass
-                    else:
-                        log.info(f"New sample: channel={chan} measurement={meas}")
-                        client.publish(cfg['topic_template'].format(chan=chan), meas)
+                    chan, meas = line
+                    log.info(f"New sample: channel={chan} measurement={meas}")
+                    client.publish(cfg['topic_template'].format(chan=chan), meas)
+
         sleep(0.001)
 
 if __name__ == "__main__":
