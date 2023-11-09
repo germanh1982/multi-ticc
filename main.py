@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from serial import Serial
 import logging
 from time import sleep, monotonic
@@ -39,17 +38,6 @@ class Ticc:
         return self._port
 
 def main():
-    p = ArgumentParser()
-    p.add_argument('--loglevel', choices=['debug', 'info', 'warning', 'error', 'critical'], default='debug')
-    p.add_argument('configfile')
-    args = p.parse_args()
-
-    with open(args.configfile) as fh:
-        cfg = yaml.safe_load(fh)
-
-    logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%b %d %H:%M:%S', level=args.loglevel.upper())
-    log = logging.getLogger(__name__)
-
     client = mqttc.Client()
     client.connect(cfg['server']['host'])
     client.loop_start()
@@ -79,6 +67,17 @@ def main():
         sleep(0.001)
 
 if __name__ == "__main__":
+    p = ArgumentParser()
+    p.add_argument('--loglevel', choices=['debug', 'info', 'warning', 'error', 'critical'], default='debug')
+    p.add_argument('configfile')
+    args = p.parse_args()
+
+    with open(args.configfile) as fh:
+        cfg = yaml.safe_load(fh)
+
+    logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%b %d %H:%M:%S', level=args.loglevel.upper())
+    log = logging.getLogger(__name__)
+
     try:
         main()
     except KeyboardInterrupt:
