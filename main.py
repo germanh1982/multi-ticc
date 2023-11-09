@@ -3,16 +3,18 @@ from serial import Serial
 import logging
 from time import sleep, monotonic
 import paho.mqtt.client as mqttc
+from argparse import ArgumentParser
+import yaml
 
 TICCS = ( '/dev/ttyACM0', '/dev/ttyACM1' )
 
 class Ticc:
     EOL = '\r\n'
 
-    def __init__(self, port, timeout):
+    def __init__(self, port, timeout, baudrate):
         self._buf = b''
         self._port = port
-        self._dev = Serial(port, baudrate=115200, timeout=timeout)
+        self._dev = Serial(port, baudrate, timeout=timeout)
 
     def fetch(self):
         to_read = self._dev.in_waiting
@@ -37,15 +39,25 @@ class Ticc:
         return self._port
 
 def main():
+    p = ArgumentParser()
+    p.add_argument('--loglevel', choices=['debug', 'info', 'warning', 'error', 'critical'], default='debug')
+    p.add_argument('configfile')
+    args = p.parse_args()
+
+    with open(args.configfile) as fh:
+        cfg = yaml.safe_load(fh)
+
+    logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%b %d %H:%M:%S', level=args.loglevel.upper())
+    log = logging.getLogger(__name__)
+
     client = mqttc.Client()
-    client.connect('localhost')
+    client.connect(cfg['server']['host'])
     client.loop_start()
+    log.info("Connected to server.")
 
-    ticcs = []
-    for port in TICCS:
-        ticcs.append(Ticc(port, timeout=1))
-
+    ticcs = [Ticc(device, timeout=cfg['boards']['timeout'], baudrate=cfg['boards']['baudrate']) for device in cfg['boards']['devices']]
     boottime = monotonic()
+    log.info(f"Fetching from {len(ticcs)} TICC devices.")
 
     while True:
         for ticc in ticcs:
@@ -55,11 +67,20 @@ def main():
             
             else:
                 for line in ticc.lines():
-                    chan, meas = line
-                    client.publish(f"meas/{chan}", meas)
+                    try:
+                        chan, meas = line
+                    except ValueError:
+                        # line has wrong format
+                        log.warning(f"Received malformed line: {line}")
+                        pass
+                    else:
+                        log.info(f"New sample: channel={chan} measurement={meas}")
+                        client.publish(cfg['topic_template'].format(chan=chan), meas)
         sleep(0.001)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    log = logging.getLogger(__name__)
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        log.info("Interrupted by user.")
+

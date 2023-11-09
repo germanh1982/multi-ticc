@@ -1,0 +1,11 @@
+boards:
+  devices:
+    - "/dev/ttyACM0"
+    - "/dev/ttyACM1"
+  baudrate: 115200
+  timeout: 1
+
+server:
+  host: "localhost"
+
+topic_template: "meas/{chan}"
